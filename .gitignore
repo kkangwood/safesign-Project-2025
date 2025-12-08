@@ -209,3 +209,6 @@ __marimo__/
 # DeepEval
 .deepeval/
 .deepeval
+
+#contracts
+contracts/
