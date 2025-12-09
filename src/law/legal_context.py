@@ -1,4 +1,4 @@
-# fetch_and_save.py
+# rag_moel.py
 
 import requests
 import json
@@ -29,7 +29,7 @@ BASE_PARAMS = {
 
 # FAISS 설정
 MODEL_NAME = 'paraphrase-multilingual-mpnet-base-v2' 
-KEYWORD = 'moel_retirement' # '고용노동부_퇴직'
+KEYWORD = 'moel' # '고용노동부'
 INDEX_FILE = f'faiss_index_{KEYWORD}.bin'
 METADATA_FILE = f'faiss_metadata_{KEYWORD}.json'
 

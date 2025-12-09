@@ -1,4 +1,4 @@
-# rag_search.py
+# rag_searchTest.py
 
 import faiss
 import json
@@ -83,7 +83,7 @@ def rag_search(user_query: str, model, index, metadata_map):
         print(f"제목: {doc_metadata['title']}")
         print(f"유사도 점수: {1 / (1 + distance):.4f}")
         print(f"원문 ID: {doc_metadata['id']}")
-        print(f"원문 내용 (일부):\n{doc_metadata['chunk_text'][:200]}...") # 200자만 출력
+        print(f"원문 내용 (일부):\n{doc_metadata['chunk_text']}")
 
     return retrieved_results
 
