@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 # [Import] src 폴더 내의 모듈을 불러옵니다.
 from src.toxic_detector import ToxicClauseDetector
+from src.llm_service import LLM_gemini
 
 # --- 1. 페이지 설정 ---
 st.set_page_config(
@@ -17,9 +18,12 @@ st.set_page_config(
 
 # --- 2. 헬퍼 함수들 (PDF 파싱 & 더미 데이터) ---
 
-def extract_text_from_pdf(pdf_file):
+def extract_text_from_pdf(pdf_file,api_key,model_name): 
     """PDF 파일에서 텍스트를 추출하는 함수"""
-    pass
+    pdf_file_bytes = pdf_file.read()
+    gemini = LLM_gemini(gemini_api_key=api_key, model=model_name)
+    result = gemini.pdf_to_text(pdf_file_bytes)
+    return result
 
 def get_dummy_contract_text():
     """테스트용 가상 근로계약서 텍스트"""
@@ -116,7 +120,7 @@ def main():
     
     if uploaded_file is not None:
         with st.spinner("PDF에서 텍스트를 추출하는 중..."):
-            extracted_text = extract_text_from_pdf(uploaded_file)
+            extracted_text = extract_text_from_pdf(uploaded_file,api_key_input,'gemini-2.0-flash-lite')
             if extracted_text:
                 contract_content = extracted_text
                 st.success("PDF 텍스트 추출 완료!")
