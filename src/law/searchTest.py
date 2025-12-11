@@ -1,14 +1,15 @@
-# rag_searchTest.py
+# legal_searchTest.py (수정 완료)
 
 import faiss
 import json
 from sentence_transformers import SentenceTransformer
 import numpy as np
+import os # os 모듈 import 추가 (FileNotFoundError 확인 시 유용)
 
 # ==============================================================================
-# 1. 설정 및 파일 경로 (fetch_and_save.py에서 저장된 파일 경로와 일치해야 합니다.)
+# 1. 설정 및 파일 경로 (legal_moel.py에서 저장된 파일 경로와 일치하도록 수정)
 # ==============================================================================
-KEYWORD = 'moel_retirement' # '고용노동부_퇴직'
+KEYWORD = 'moel' # <-- 'moel_retirement'에서 'moel'로 수정
 MODEL_NAME = 'paraphrase-multilingual-mpnet-base-v2' 
 INDEX_FILE = f'faiss_index_{KEYWORD}.bin'
 METADATA_FILE = f'faiss_metadata_{KEYWORD}.json'
@@ -21,6 +22,10 @@ TOP_K = 3 # 가장 유사한 상위 K개의 문서를 검색
 def load_db():
     """FAISS 인덱스와 메타데이터를 로드합니다."""
     try:
+        # 파일 존재 여부 확인 로직 추가 (오류 메시지 명확화)
+        if not os.path.exists(INDEX_FILE) or not os.path.exists(METADATA_FILE):
+             raise FileNotFoundError(f"FAISS 파일({INDEX_FILE} 또는 {METADATA_FILE})을 찾을 수 없습니다.")
+
         # FAISS 인덱스 로드
         index = faiss.read_index(INDEX_FILE)
         
@@ -34,9 +39,9 @@ def load_db():
         print(f"✅ DB 로드 완료. 벡터 수: {index.ntotal}, 차원: {index.d}")
         return model, index, metadata_map
         
-    except FileNotFoundError:
-        print(f"❌ 오류: FAISS 파일({INDEX_FILE} 또는 {METADATA_FILE})을 찾을 수 없습니다.")
-        print("`fetch_and_save.py`를 먼저 실행하여 파일을 생성해 주세요.")
+    except FileNotFoundError as e:
+        print(f"❌ 오류: {e}")
+        print("DB 구축 시 사용한 KEYWORD가 현재 설정과 일치하는지 확인해 주세요.")
         return None, None, None
     except Exception as e:
         print(f"❌ DB 로드 중 알 수 없는 오류 발생: {e}")
@@ -69,9 +74,10 @@ def rag_search(user_query: str, model, index, metadata_map):
         doc_metadata = metadata_map[doc_index]
         
         # 결과 저장
+        score = 1 / (1 + distance)
         retrieved_results.append({
             "rank": rank + 1,
-            "score": 1 / (1 + distance), # 유사도 점수 (간단한 거리 역수 변환)
+            "score": score,
             "title": doc_metadata['title'],
             "source_id": doc_metadata['id'],
             "detail_url": doc_metadata['detail_url'],
@@ -81,7 +87,7 @@ def rag_search(user_query: str, model, index, metadata_map):
         # 출력
         print(f"\n--- [검색 결과 {rank + 1}위] ---")
         print(f"제목: {doc_metadata['title']}")
-        print(f"유사도 점수: {1 / (1 + distance):.4f}")
+        print(f"유사도 점수: {score:.4f}")
         print(f"원문 ID: {doc_metadata['id']}")
         print(f"원문 내용 (일부):\n{doc_metadata['chunk_text']}")
 
