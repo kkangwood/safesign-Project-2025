@@ -122,16 +122,17 @@ function App() {
 
     try {
       // [실제 통신] 주석 해제하여 사용
-      // const data = await apiService.uploadPDF(file, apiKey);
-      // setPdfText(data.text);
+      console.log("파일 전송 중:", file.name);
+      const data = await apiService.uploadPDF(file, apiKey);
+      setPdfText(data.text);
+      setStep('review');
+      setIsLoading(false);
 
       // [테스트용 Mock] (서버 없이 테스트할 때 사용)
-      console.log("파일 전송 중:", file.name);
-      setTimeout(() => {
-        setPdfText(MOCK_DATA.text);
-        setStep('review');
-        setIsLoading(false);
-      }, 1000);
+      // setTimeout(() => {
+      //   setPdfText(MOCK_DATA.text);
+        
+      // }, 1000);
 
     } catch (error) {
       alert('업로드 중 오류가 발생했습니다.');

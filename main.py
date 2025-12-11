@@ -20,7 +20,7 @@ st.set_page_config(
 
 def extract_text_from_pdf(pdf_file,api_key,model_name): 
     """PDF 파일에서 텍스트를 추출하는 함수"""
-    pdf_file_bytes = pdf_file.read()
+    pdf_file_bytes = pdf_file.read()   
     gemini = LLM_gemini(gemini_api_key=api_key, model=model_name)
     result = gemini.pdf_to_text(pdf_file_bytes)
     return result
