@@ -89,7 +89,7 @@ def process_single_clause(detector, clause, index):
             "status": "error"
         }
 
-# --- 3. 메인 어플리케이션 ---
+# --- 3. 메인 어플리케이션 --- 
 def main():
     # 사이드바 설정
     with st.sidebar:
@@ -152,11 +152,11 @@ def main():
 
         # 2. Detector 초기화 (캐싱)
         @st.cache_resource
-        def get_detector():
-            return ToxicClauseDetector()
+        def get_detector(key):
+            return ToxicClauseDetector(key)
         
         with st.spinner("⚙️ 법령 DB 및 AI 엔진 초기화 중... (최초 1회만 소요)"):
-            detector = get_detector()
+            detector = get_detector(api_key_input)
 
         st.info(f"총 {len(chunks)}개의 조항을 순서대로 분석합니다.")
 
