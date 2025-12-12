@@ -99,7 +99,9 @@ async def analyze_contract(request: AnalyzeRequest):
                 results.append(res)
                 if i%5 == 0 or (i+1 == len(chunks)):
                     yield json.dumps({"status": "progress", "current": i+1,"total": len(chunks) , "message": "AI가 독소 조항을 판별 중입니다..."}) + "\n"
-                
+            
+            await asyncio.sleep(0.01)    
+
             # status: complete와 함께 결과 데이터 전송
             yield json.dumps({"status": "complete", "results": results}) + "\n"
 

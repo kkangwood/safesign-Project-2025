@@ -3,7 +3,7 @@ import json
 import re
 # from dotenv import load_dotenv
 # from langchain_google_genai import ChatGoogleGenerativeAI (염준화)
-from src.llm_service import LLM_gemini
+from llm_service import LLM_gemini
 
 # [추가] 실행을 위한 필수 라이브러리 및 임시 클래스 정의
 # ---------------------------------------------------------------------------
