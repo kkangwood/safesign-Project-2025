@@ -68,6 +68,21 @@ class PrecedentContextManager:
                 print(f"  📥 페이지 {page}/{total_pages} ({len(precedents)}건) 판례 상세 다운로드 및 파싱...")
 
                 for prec_info in precedents:
+                    # ==========================================
+                    # [수정됨] 데이터 타입 방어 코드 추가 구간
+                    # ==========================================
+                    
+                    # 1. 문자열(String)이 잘못 들어온 경우 체크
+                    if isinstance(prec_info, str):
+                        print(f"⚠️ [경고] 예상치 못한 데이터 타입(str) 발견 -> 건너뜀. 내용: {prec_info}")
+                        continue
+                    
+                    # 2. 딕셔너리가 아닌 경우 체크
+                    if not isinstance(prec_info, dict):
+                        print(f"⚠️ [경고] 딕셔너리가 아닌 데이터 타입({type(prec_info)}) 발견 -> 건너뜀.")
+                        continue
+
+                    # 3. 안전하게 .get() 호출
                     prec_id = prec_info.get("판례일련번호")
                     
                     if not prec_id or prec_id in precedent_ids:
