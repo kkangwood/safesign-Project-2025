@@ -99,9 +99,59 @@ class PrecedentContextManager:
                 print(f"⚠️ 기존 DB 로드 실패: {e}. DB를 새로 구축합니다.")
         
         # 2. 신규 DB 구축
-        print("📚 [초기화] 판례 데이터 신규 구축을 시작합니다...")
-        all_docs = self._fetch_and_parse_precedents() # 판례 데이터 수집 및 변환
+        print(f"📚 [초기화] 필수 판례 데이터 신규 구축을 시작합니다. (페이지당 {display}건, 최대 {max_pages} 페이지)")
+        all_docs = []       # 수집된 모든 Document 객체 리스트
+        precedent_ids = set() # 판례일련번호 중복 방지용 Set
 
+        for query in self.target_queries:
+            print(f"\n  🔍 '{query}' 검색 중...")
+            page = 1
+            
+            # 검색 결과를 중복 없이 수집
+            while page <= max_pages: 
+                # 판례 목록 검색
+                precedents, total_count = search_precedent_list(query, display=display, page=page)
+                
+                if not precedents:
+                    break
+                
+                total_pages = (total_count + display - 1) // display
+                print(f"  📥 페이지 {page}/{total_pages} ({len(precedents)}건) 판례 상세 다운로드 및 파싱...")
+
+                for prec_info in precedents:
+                    # ==========================================
+                    # [수정됨] 데이터 타입 방어 코드 추가 구간
+                    # ==========================================
+                    
+                    # 1. 문자열(String)이 잘못 들어온 경우 체크
+                    if isinstance(prec_info, str):
+                        print(f"⚠️ [경고] 예상치 못한 데이터 타입(str) 발견 -> 건너뜀. 내용: {prec_info}")
+                        continue
+                    
+                    # 2. 딕셔너리가 아닌 경우 체크
+                    if not isinstance(prec_info, dict):
+                        print(f"⚠️ [경고] 딕셔너리가 아닌 데이터 타입({type(prec_info)}) 발견 -> 건너뜀.")
+                        continue
+
+                    # 3. 안전하게 .get() 호출
+                    prec_id = prec_info.get("판례일련번호")
+                    
+                    if not prec_id or prec_id in precedent_ids:
+                        continue 
+                    
+                    # 2-1. 판례 상세 내용(요지, 판시사항) 가져오기
+                    summary_list, holding = get_precedent_detail_text(prec_id)
+                    
+                    # 2-2. 문서 객체로 변환 및 중복 검사 후 추가
+                    full_text, metadata = parse_precedent_content(summary_list, holding, prec_info)
+                    
+                    if full_text:
+                        doc = Document(page_content=full_text, metadata=metadata)
+                        all_docs.append(doc)
+                        precedent_ids.add(prec_id) 
+
+                page += 1
+                
         if not all_docs:
             print("❌ 저장할 판례 데이터가 없어 DB 생성을 건너뜁니다.")
             return

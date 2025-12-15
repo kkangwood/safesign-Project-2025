@@ -1,4 +1,5 @@
 from google import genai
+from google.genai import types
 
 # 1. gemini 객체 만들기
 class LLM_gemini():
@@ -44,10 +45,14 @@ class LLM_gemini():
     # prompt에 맞는 텍스트를 출력하는 함수
     # toxic_detector.py에서 필요하다.
     def generate(self,prompt):
+        # [수정] config에 temperature=0.0 추가
         response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt
+            model=self.model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.0  # 0.0으로 설정하면 가장 논리적이고 일관된 답변을 줍니다.
             )
+        )
         return response
     
 

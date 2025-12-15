@@ -330,8 +330,8 @@ function App() {
                       // 백엔드 키값 (is_toxic) 사용
                       if (matchedResult.is_toxic) {
                          // 점수가 있다면 점수별 색상, 없다면 기본 독소 색상
-                         const score = matchedResult.score || 0.9; 
-                         if (score > 0.8) highlightClass = "bg-red-100/80 text-red-900 border-b-2 border-red-200";
+                         const score = matchedResult.score || 9.0; 
+                         if (score > 8.0) highlightClass = "bg-red-100/80 text-red-900 border-b-2 border-red-200";
                          else highlightClass = "bg-yellow-100/80 text-yellow-900 border-b-2 border-yellow-200";
                       }
                     }
