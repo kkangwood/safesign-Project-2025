@@ -54,32 +54,7 @@ def parse_text_to_chunks(text):
     # 공백 제거 및 유효한 조항만 필터링
     clean_chunks = [c.strip() for c in chunks if len(c.strip()) > 10]
     return clean_chunks
-# def process_single_clause(detector, clause, index):
-#     """단위 작업: 조항 하나 분석"""
-#     try:
-#         detection = detector.detect(clause)
-        
-#         suggestion = ""
-#         if detection['is_toxic']:
-#             suggestion = detector.generate_easy_suggestion(detection)
-            
-#         return {
-#             "id": index + 1,
-#             "clause": clause,
-#             "is_toxic": detection['is_toxic'],
-#             "score": detection['risk_score'],
-#             "reason": detection['reason'],
-#             "context": detection['context_used'],
-#             "suggestion": suggestion,
-#             "status": "success"
-#         }
-#     except Exception as e:
-#         return {
-#             "id": index + 1,
-#             "clause": clause,
-#             "error": str(e),
-#             "status": "error"
-#         }
+
 class AnalyzeRequest(BaseModel):
     api_key: str
     text: str
