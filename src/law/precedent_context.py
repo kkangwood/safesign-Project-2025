@@ -23,7 +23,7 @@ class PrecedentContextManager:
         self.embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
         # ⚠️ 참고: self.embeddings 객체를 생성할 때 네트워크 연결이 필요할 수 있습니다.
 
-    def initialize_database(self):
+    def create_database(self):
         """
         Hugging Face 데이터셋에서 판례를 다운로드하고 Document 객체로 변환합니다.
         """
@@ -95,7 +95,7 @@ class PrecedentContextManager:
         
         # 2. 신규 DB 구축
         print("📚 [초기화] 판례 데이터 신규 구축을 시작합니다...")
-        all_docs = self.initialize_database()
+        all_docs = self.create_database()
 
         if not all_docs:
             print("❌ 저장할 판례 데이터가 없어 DB 생성을 건너뜁니다.")
