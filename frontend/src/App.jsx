@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, FileText, Shield, AlertTriangle, ChevronDown, ChevronUp, Key, Info } from 'lucide-react';
+import { Upload, FileText, Shield, AlertTriangle, ChevronDown, ChevronUp, Key, Info, BookOpen, X } from 'lucide-react';
 
 // ==================================================================================
 // [1] 설정 및 API 요청 함수 (Service Layer)
@@ -103,6 +103,9 @@ function App() {
   const [showToxicOnly, setShowToxicOnly] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   
+  // 모달 상태 (새로 추가됨)
+  const [modalData, setModalData] = useState(null); // null이면 닫힘, 데이터가 있으면 열림
+
   // 리사이징 상태
   const [sidebarWidth, setSidebarWidth] = useState(500); 
   const [isResizing, setIsResizing] = useState(false);
@@ -130,6 +133,7 @@ function App() {
 
     setPdfFile(file); 
     setIsLoading(true);
+    setProgressStatus({ message: '파일 업로드 및 텍스트 추출 중...' });
 
     try {
       console.log("파일 전송 중:", file.name);
@@ -169,8 +173,8 @@ function App() {
 
   // 3. 인터랙션 (카드 클릭 -> 스크롤)
   const toggleExpand = (item) => {
-    // 독소 조항이 아니면(is_toxic false) 클릭 방지하고 싶다면 아래 주석 해제
-    // if (!item.is_toxic) return; 
+    // [수정됨] is_toxic이 True인 항목만 클릭 가능
+    if (!item.is_toxic) return;
 
     setExpandedId(expandedId === item.id ? null : item.id);
 
@@ -182,7 +186,17 @@ function App() {
     }
   };
 
-  // 4. 리사이징
+  // 4. 모달 핸들러 (새로 추가됨)
+  const openModal = (e, item) => {
+    e.stopPropagation(); // 카드 토글 방지
+    setModalData(item);
+  };
+
+  const closeModal = () => {
+    setModalData(null);
+  };
+
+  // 5. 리사이징
   useEffect(() => {
     const handleMouseMove = (e) => {
       if (!isResizing) return;
@@ -211,12 +225,79 @@ function App() {
   
   const toxicCount = resultList.filter(r => r.is_toxic).length;
 
+  // [수정됨] 리스크 점수 기반 색상 결정 헬퍼 함수
+  const getRiskColor = (score) => {
+    // 7.0 이상: 빨강 (위험)
+    if (score >= 7.0) return {
+      bg: "bg-red-50",
+      border: "border-red-200",
+      badge: "bg-red-100 text-red-700 border-red-200",
+      text: "text-red-900"
+    };
+    // 4.0 이상 7.0 미만: 노랑 (주의)
+    if (score >= 4.0) return {
+      bg: "bg-yellow-50",
+      border: "border-yellow-200",
+      badge: "bg-yellow-100 text-yellow-800 border-yellow-200",
+      text: "text-yellow-900"
+    };
+    // 4.0 미만: 초록 (안전)
+    return {
+      bg: "bg-green-50",
+      border: "border-green-200",
+      badge: "bg-green-100 text-green-700 border-green-200",
+      text: "text-green-900"
+    };
+  };
+
 
   // --- 렌더링 ---
   return (
-    <div className="flex h-screen bg-gray-50 font-sans overflow-hidden select-none">
+    <div className="flex h-screen bg-gray-50 font-sans overflow-hidden select-none relative">
       
-      {/* 1. 사이드바 */}
+      {/* 1. 모달 (새로 추가됨) */}
+      {modalData && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+            {/* 모달 헤더 */}
+            <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-blue-600"/>
+                법적 근거 및 판례
+              </h3>
+              <button onClick={closeModal} className="p-1 rounded-full hover:bg-slate-200 transition-colors">
+                <X className="w-6 h-6 text-slate-500" />
+              </button>
+            </div>
+            
+            {/* 모달 내용 */}
+            <div className="p-6 overflow-y-auto space-y-6">
+              <div>
+                <h4 className="text-sm font-bold text-slate-500 mb-2 uppercase tracking-wide">판단 근거 조항 (Clause)</h4>
+                <div className="p-4 bg-slate-100 rounded-lg text-slate-800 leading-relaxed font-medium border border-slate-200">
+                  {modalData.reason}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-bold text-slate-500 mb-2 uppercase tracking-wide">참고 판례 / 법령 (Context Used)</h4>
+                <div className="p-4 bg-blue-50 rounded-lg text-slate-800 leading-relaxed text-sm border border-blue-100 whitespace-pre-wrap">
+                  {modalData.context_used || "관련된 구체적인 판례나 법령 데이터가 제공되지 않았습니다."}
+                </div>
+              </div>
+            </div>
+
+            {/* 모달 하단 */}
+            <div className="p-4 border-t border-slate-200 bg-slate-50 text-right">
+              <button onClick={closeModal} className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium transition-colors">
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. 사이드바 */}
       <aside className="w-72 bg-slate-900 text-white flex flex-col p-6 shadow-xl z-10 flex-shrink-0">
         <div className="flex items-center gap-3 mb-10">
           <Shield className="w-8 h-8 text-blue-400" />
@@ -234,7 +315,6 @@ function App() {
           </div>
         </div>
         
-        {/* 가이드 복구 */}
         <div className="mt-auto">
           <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
             <h3 className="flex items-center gap-2 text-sm font-semibold mb-3 text-slate-300">
@@ -250,31 +330,20 @@ function App() {
         </div>
       </aside>
 
-      {/* 2. 메인 영역 */}
+      {/* 3. 메인 영역 */}
       <main className="flex-1 flex flex-col p-8 overflow-hidden relative min-w-[400px]">
-        {/* 로딩 & 프로그레스 오버레이 */}
+        {/* [수정됨] 로딩 오버레이: 프로그레스 바 제거, 뱅글뱅글 도는 스피너 + 메시지 */}
         {isLoading && (
           <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-8">
-            <div className="w-16 h-16 border-4 border-slate-100 border-t-blue-600 rounded-full animate-spin mb-6"></div>
-            
-            <h3 className="text-xl font-bold text-slate-800 mb-2">{progressStatus.message}</h3>
-            
-            {/* [수정됨] [ 5 / 20 ] 형태 표시 */}
-            {step !== 'upload' &&(<>
-            <div className="text-3xl font-mono font-bold text-blue-600 mb-4 tracking-widest">
-              [ <span className="text-slate-800">{progressStatus.current}</span> / {progressStatus.total || '-'} ]
+            <div className="relative">
+              <div className="w-16 h-16 border-4 border-slate-200 rounded-full"></div>
+              <div className="w-16 h-16 border-4 border-blue-600 rounded-full border-t-transparent animate-spin absolute top-0 left-0"></div>
             </div>
-
-            <div className="w-full max-w-md h-3 bg-slate-200 rounded-full overflow-hidden relative">
-              <div 
-                className="h-full bg-blue-600 transition-all duration-300 ease-out relative"
-                style={{ width: `${progressStatus.total ? (progressStatus.current / progressStatus.total) * 100 : 0}%` }}
-              >
-                 <div className="absolute top-0 left-0 bottom-0 right-0 bg-gradient-to-r from-transparent via-white/30 to-transparent w-full -translate-x-full animate-shimmer"></div>
-              </div>
-            </div>
-            </>
-          )}
+            
+            <h3 className="mt-8 text-lg font-bold text-slate-800 animate-pulse">
+              {progressStatus.message || "처리 중..."}
+            </h3>
+            <p className="text-slate-500 text-sm mt-2">잠시만 기다려주세요</p>
           </div>
         )}
 
@@ -316,24 +385,22 @@ function App() {
                   {pdfText.split('\n').map((line, index) => {
                     if (!line.trim()) return <br key={index} />;
                     
-                    // [수정됨] 하이라이트 매칭 로직 변경 (title -> clause)
-                    // 줄이 조항 텍스트의 앞부분(약 10~20자)을 포함하는지 확인
                     const matchedResult = resultList.find(r => 
                       line.trim().startsWith(r.clause.substring(0, 15).trim()) || 
-                      r.clause.includes(line.trim()) && line.trim().length > 10
+                      (r.clause.includes(line.trim()) && line.trim().length > 10)
                     );
                     
                     let highlightClass = "";
                     let riskId = "";
+                    
                     if (matchedResult) {
                       riskId = `line-${matchedResult.id}`;
-                      // 백엔드 키값 (is_toxic) 사용
-                      if (matchedResult.is_toxic) {
-                         // 점수가 있다면 점수별 색상, 없다면 기본 독소 색상
-                         const score = matchedResult.score || 9.0; 
-                         if (score > 8.0) highlightClass = "bg-red-100/80 text-red-900 border-b-2 border-red-200";
-                         else highlightClass = "bg-yellow-100/80 text-yellow-900 border-b-2 border-yellow-200";
-                      }
+                      const score = matchedResult.risk_score || 0;
+                      const colors = getRiskColor(score);
+                      
+                      // 텍스트 뷰 하이라이트는 조금 더 연하게
+                      if (score >= 7.0) highlightClass = "bg-red-100/50 text-red-900 border-b-2 border-red-200";
+                      else if (score >= 4.0) highlightClass = "bg-yellow-100/50 text-yellow-900 border-b-2 border-yellow-200";
                     }
                     return <p key={index} id={riskId} className={`mb-2 px-1 rounded transition-colors ${highlightClass}`}>{line}</p>;
                   })}
@@ -352,15 +419,14 @@ function App() {
         </div>
       </main>
 
-      {/* 3. 분석 결과 사이드바 */}
+      {/* 4. 분석 결과 사이드바 */}
       {step === 'result' && (
         <aside ref={sidebarRef} className="bg-white border-l border-slate-200 flex flex-col shadow-2xl flex-shrink-0 relative" style={{ width: sidebarWidth }}>
           {/* 리사이징 핸들 */}
-          <div onMouseDown={() => setIsResizing(true)} className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400 transition-colors z-50 flex items-center justify-center group">
+          <div onMouseDown={() => setIsResizing(true)} className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400 transition-colors z-40 flex items-center justify-center group">
             <div className="h-8 w-1 bg-slate-300 rounded-full group-hover:bg-white transition-colors"></div>
           </div>
 
-          {/* 헤더 복구 */}
           <div className="p-6 border-b border-slate-100">
             <h3 className="text-lg font-bold text-slate-800 mb-4">분석 리포트</h3>
             <div className="flex gap-2 mb-4">
@@ -392,33 +458,57 @@ function App() {
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
             {filteredResults.map((item) => {
-              // 백엔드 키값 사용: item.clause, item.is_toxic, item.suggestion
-              const isToxic = item.is_toxic;
+              const isToxic = item.is_toxic; // True / False 여부
+              const riskScore = item.risk_score || 0; // 점수
               const isExpanded = expandedId === item.id;
               
-              let cardClass = isToxic ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50/30";
-              let badgeClass = isToxic ? "bg-red-100 text-red-700 border-red-200" : "bg-green-100 text-green-700 border-green-200";
-              let statusText = isToxic ? "독소조항" : "안전";
-
+              // [수정됨] risk_score에 따른 색상 구분 (7.0 이상 Red / 4.0 이상 Yellow / 그 외 Green)
+              const colors = getRiskColor(riskScore);
+              
               return (
-                <div key={item.id} onClick={() => toggleExpand(item)} className={`rounded-xl border p-4 relative cursor-pointer hover:shadow-md transition-all ${cardClass}`}>
+                <div 
+                  key={item.id} 
+                  // [수정됨] 독소 조항(True)인 경우만 클릭 이벤트 핸들러 연결
+                  onClick={() => toggleExpand(item)} 
+                  className={`rounded-xl border p-4 relative transition-all ${colors.bg} ${colors.border} 
+                    ${isToxic ? 'cursor-pointer hover:shadow-md' : 'cursor-default opacity-80'}`}
+                >
                   <div className="flex justify-between items-start mb-2">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${badgeClass}`}>{statusText}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${colors.badge}`}>
+                        Risk: {riskScore}
+                      </span>
+                    </div>
+                    {/* 독소 조항인 경우에만 화살표 표시 */}
                     {isToxic && (isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400"/> : <ChevronDown className="w-4 h-4 text-slate-400"/>)}
                   </div>
                   
                   {/* 조항 내용 (제목) */}
-                  <h4 className="font-bold text-slate-800 text-sm mb-1 line-clamp-2 leading-snug">{item.clause}</h4>
+                  <h4 className={`font-bold text-sm mb-1 line-clamp-2 leading-snug ${colors.text}`}>{item.clause}</h4>
                   
+                  {/* [수정됨] 독소 조항이며 확장되었을 때의 내용 */}
                   {isToxic && isExpanded && (
-                    <div className="mt-3 space-y-3 border-t border-black/5 pt-3">
-                      <div>
-                        <p className="text-xs font-bold text-slate-500 mb-1">⚠️ 판단 근거</p>
-                        <p className="text-xs text-slate-700 bg-white/50 p-2 rounded leading-relaxed">{item.reason}</p>
+                    <div className="mt-3 pt-3 border-t border-black/5 animate-in slide-in-from-top-2 duration-200">
+                      
+                      {/* 쉬운 해석 (Suggestion) */}
+                      <div className="mb-3">
+                        <p className="text-xs font-bold text-blue-600 mb-1 flex items-center gap-1">
+                          💡 쉬운 해석 (Suggestion)
+                        </p>
+                        <p className="text-xs text-slate-700 bg-white/60 p-2.5 rounded border border-blue-100 leading-relaxed">
+                          {item.suggestion}
+                        </p>
                       </div>
-                      <div>
-                        <p className="text-xs font-bold text-blue-600 mb-1">💡 수정 제안</p>
-                        <p className="text-xs text-blue-800 bg-blue-50 p-2 rounded leading-relaxed">{item.suggestion}</p>
+
+                      {/* [수정됨] 우측 하단 버튼 추가 */}
+                      <div className="flex justify-end mt-2">
+                        <button 
+                          onClick={(e) => openModal(e, item)}
+                          className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-white text-[10px] px-3 py-1.5 rounded-full font-medium transition-colors shadow-sm"
+                        >
+                          <BookOpen className="w-3 h-3" />
+                          참고 판례/법령 보기
+                        </button>
                       </div>
                     </div>
                   )}

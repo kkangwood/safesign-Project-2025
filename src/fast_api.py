@@ -54,32 +54,32 @@ def parse_text_to_chunks(text):
     # 공백 제거 및 유효한 조항만 필터링
     clean_chunks = [c.strip() for c in chunks if len(c.strip()) > 10]
     return clean_chunks
-def process_single_clause(detector, clause, index):
-    """단위 작업: 조항 하나 분석"""
-    try:
-        detection = detector.detect(clause)
+# def process_single_clause(detector, clause, index):
+#     """단위 작업: 조항 하나 분석"""
+#     try:
+#         detection = detector.detect(clause)
         
-        suggestion = ""
-        if detection['is_toxic']:
-            suggestion = detector.generate_easy_suggestion(detection)
+#         suggestion = ""
+#         if detection['is_toxic']:
+#             suggestion = detector.generate_easy_suggestion(detection)
             
-        return {
-            "id": index + 1,
-            "clause": clause,
-            "is_toxic": detection['is_toxic'],
-            "score": detection['risk_score'],
-            "reason": detection['reason'],
-            "context": detection['context_used'],
-            "suggestion": suggestion,
-            "status": "success"
-        }
-    except Exception as e:
-        return {
-            "id": index + 1,
-            "clause": clause,
-            "error": str(e),
-            "status": "error"
-        }
+#         return {
+#             "id": index + 1,
+#             "clause": clause,
+#             "is_toxic": detection['is_toxic'],
+#             "score": detection['risk_score'],
+#             "reason": detection['reason'],
+#             "context": detection['context_used'],
+#             "suggestion": suggestion,
+#             "status": "success"
+#         }
+#     except Exception as e:
+#         return {
+#             "id": index + 1,
+#             "clause": clause,
+#             "error": str(e),
+#             "status": "error"
+#         }
 class AnalyzeRequest(BaseModel):
     api_key: str
     text: str
@@ -88,26 +88,53 @@ async def analyze_contract(request: AnalyzeRequest):
     # 제너레이터 함수: 데이터를 조금씩 나누어 보냅니다.
     async def event_stream():
         try:
+            yield json.dumps({"status": "progress","message": "법령, 판례 DB 불러오는 중..."}) + "\n"
             detector = ToxicClauseDetector(api_key=request.api_key)
-            results = []
             chunks  = parse_text_to_chunks(request.text)
+            yield json.dumps({"status": "progress","message": f"총 {len(chunks)}개의 조항을 분석 중..."}) + "\n"
+            raw_results = detector.detect(chunks, max_concurrent=5)
 
-            yield json.dumps({"status": "progress", "current": 0, "total": len(chunks), "message": "분석 시작..."}) + "\n"
-            for i, clause in enumerate(chunks):
-                res = process_single_clause(detector, clause, i)
-                
-                results.append(res)
-                if i%5 == 0 or (i+1 == len(chunks)):
-                    yield json.dumps({"status": "progress", "current": i+1,"total": len(chunks) , "message": "AI가 독소 조항을 판별 중입니다..."}) + "\n"
+            processed_results = []
+            toxic_indices = [] # 개선안 생성이 필요한 인덱스들
+
+            for i, res in enumerate(raw_results):
+                # detect 함수에서 나온 결과에 ID(조항 번호) 추가
+                res['id'] = i + 1
+                res['suggestion'] = "" # 초기화
+                processed_results.append(res)
             
-            await asyncio.sleep(0.01)    
-
-            # status: complete와 함께 결과 데이터 전송
-            yield json.dumps({"status": "complete", "results": results}) + "\n"
-
+                if res['is_toxic']:
+                    toxic_indices.append(i)
         except Exception as e:
-            # 에러 발생 시 에러 메시지 전송
-            yield json.dumps({"status": "error", "message": str(e)}) + "\n"
+            yield json.dumps({"status": "error", "message": f"분석 단계 오류: {str(e)}"}) + "\n"
+            return 
+        
+        try:  
+            if toxic_indices:
+                for idx, list_idx in enumerate(toxic_indices):
+                    yield json.dumps({"status": "progress","message": f"위험 조항({processed_results[list_idx]['id']})에 대한 개선안 생성 중..."}) + "\n"
+                    
+                    # 해당 결과 가져오기
+                    target_result = processed_results[list_idx]
+                    
+                    # 개선안 생성 호출
+                    try:
+                        suggestion = detector.generate_easy_suggestion(target_result)
+                        processed_results[list_idx]['suggestion'] = suggestion
+                    except Exception as e:
+                        processed_results[list_idx]['suggestion'] = "개선안 생성 실패"
+            
+            
+            yield json.dumps({"status": "complete", "results": processed_results}) + "\n"
+               
+        except Exception as e:
+            yield json.dumps({"status": "error", "message": f"개선안 생성 오류: {str(e)}"}) + "\n"
+            return 
+        
+            
+
+        # status: complete와 함께 결과 데이터 전송
+        
 
     # StreamingResponse로 감싸서 반환 (media_type 중요)
     return StreamingResponse(event_stream(), media_type="application/x-ndjson")
