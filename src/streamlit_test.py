@@ -5,12 +5,13 @@ import time
 from dotenv import load_dotenv
 
 # [Import] src 폴더 내의 모듈을 불러옵니다.
+# 실제 파일 경로에 맞게 수정 필요 (예: from src.toxic_detector import ...)
 from toxic_detector import ToxicClauseDetector
 from llm_service import LLM_gemini
 
 # --- 1. 페이지 설정 ---
 st.set_page_config(
-    page_title="근로계약서 독소조항 판별기",
+    page_title="근로계약서 독소조항 판별기 (Parallel)",
     page_icon="⚖️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -18,12 +19,16 @@ st.set_page_config(
 
 # --- 2. 헬퍼 함수들 (PDF 파싱 & 더미 데이터) ---
 
-def extract_text_from_pdf(pdf_file,api_key,model_name): 
+def extract_text_from_pdf(pdf_file, api_key, model_name): 
     """PDF 파일에서 텍스트를 추출하는 함수"""
-    pdf_file_bytes = pdf_file.read()   
-    gemini = LLM_gemini(gemini_api_key=api_key, model=model_name)
-    result = gemini.pdf_to_text(pdf_file_bytes)
-    return result
+    try:
+        pdf_file_bytes = pdf_file.read()   
+        gemini = LLM_gemini(gemini_api_key=api_key, model=model_name)
+        result = gemini.pdf_to_text(pdf_file_bytes)
+        return result
+    except Exception as e:
+        st.error(f"PDF 처리 중 오류 발생: {e}")
+        return None
 
 def get_dummy_contract_text():
     """테스트용 가상 근로계약서 텍스트"""
@@ -58,42 +63,16 @@ def parse_text_to_chunks(text):
         return []
     split_pattern = r'(?=\n\s*제\s*\d+\s*조)'
     chunks = re.split(split_pattern, text)
-    # 공백 제거 및 유효한 조항만 필터링
+    # 공백 제거 및 유효한 조항만 필터링 (너무 짧은 문장은 제외)
     clean_chunks = [c.strip() for c in chunks if len(c.strip()) > 10]
     return clean_chunks
-
-def process_single_clause(detector, clause, index):
-    """단위 작업: 조항 하나 분석"""
-    try:
-        detection = detector.detect(clause)
-        
-        suggestion = ""
-        if detection['is_toxic']:
-            suggestion = detector.generate_easy_suggestion(detection)
-            
-        return {
-            "id": index + 1,
-            "clause": clause,
-            "is_toxic": detection['is_toxic'],
-            "score": detection['risk_score'],
-            "reason": detection['reason'],
-            "context": detection['context_used'],
-            "suggestion": suggestion,
-            "status": "success"
-        }
-    except Exception as e:
-        return {
-            "id": index + 1,
-            "clause": clause,
-            "error": str(e),
-            "status": "error"
-        }
 
 # --- 3. 메인 어플리케이션 --- 
 def main():
     # 사이드바 설정
     with st.sidebar:
         st.title("⚖️ Contract Guardian")
+        st.caption("Parallel Processing Edition")
         st.markdown("---")
         
         load_dotenv()
@@ -111,28 +90,26 @@ def main():
 
     # 메인 화면
     st.title("📄 근로계약서 독소조항 판별기")
-    st.markdown("계약서를 업로드하거나 내용을 직접 입력하면 AI가 **독소조항**을 찾아냅니다.")
+    st.markdown("계약서를 업로드하면 AI가 **병렬 처리(Parallel Processing)**를 통해 신속하게 독소조항을 찾아냅니다.")
 
-    # --- [핵심 변경] 파일 업로드 및 텍스트 로딩 로직 ---
+    # 파일 업로드 및 텍스트 로딩
     uploaded_file = st.file_uploader("근로계약서 PDF 업로드 (선택사항)", type=["pdf"])
     
     contract_content = ""
     
     if uploaded_file is not None:
         with st.spinner("PDF에서 텍스트를 추출하는 중..."):
-            extracted_text = extract_text_from_pdf(uploaded_file,api_key_input,'gemini-2.0-flash-lite')
+            extracted_text = extract_text_from_pdf(uploaded_file, api_key_input, 'gemini-1.5-flash')
             if extracted_text:
                 contract_content = extracted_text
                 st.success("PDF 텍스트 추출 완료!")
             else:
                 contract_content = get_dummy_contract_text()
-                st.warning("PDF 텍스트 추출에 실패하여 예시 데이터를 불러옵니다.")
+                st.warning("PDF 텍스트 추출 실패. 예시 데이터를 사용합니다.")
     else:
-        # 파일이 없으면 더미 데이터 사용
         contract_content = get_dummy_contract_text()
 
-    # 텍스트 에디터 (수정 가능)
-    # PDF 내용을 불러왔더라도 여기서 사용자가 오타를 수정할 수 있음
+    # 텍스트 에디터
     final_text = st.text_area("계약서 내용 확인 및 수정", value=contract_content, height=300)
 
     # API 키 체크
@@ -141,7 +118,7 @@ def main():
         return
 
     # [분석 버튼]
-    if st.button("🚀 독소조항 분석 시작", use_container_width=True):
+    if st.button("🚀 독소조항 고속 분석 시작", use_container_width=True):
         
         # 1. Parsing
         chunks = parse_text_to_chunks(final_text)
@@ -155,34 +132,73 @@ def main():
         def get_detector(key):
             return ToxicClauseDetector(key)
         
-        with st.spinner("⚙️ 법령 DB 및 AI 엔진 초기화 중... (최초 1회만 소요)"):
+        with st.spinner("⚙️ AI 엔진 및 법률 DB 로딩 중..."):
             detector = get_detector(api_key_input)
 
-        st.info(f"총 {len(chunks)}개의 조항을 순서대로 분석합니다.")
+        st.info(f"총 {len(chunks)}개의 조항을 병렬로 분석합니다. 잠시만 기다려주세요...")
 
-        # 3. 순차 실행 루프
-        results = []
-        progress_bar = st.progress(0)
-        status_text = st.empty()
+        # --- [핵심 변경] 병렬 처리 실행 ---
+        try:
+            start_time = time.time()
+            
+            # DeepEval의 evaluate 함수가 내부적으로 병렬 처리를 수행합니다.
+            # 루프를 돌리지 않고 리스트 전체를 넘깁니다.
+            raw_results = detector.detect(chunks, max_concurrent=5)
+            
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            
+        except Exception as e:
+            st.error(f"분석 중 치명적인 오류 발생: {e}")
+            st.stop()
+
+        # 3. 결과 후처리 (ID 부여 및 개선안 생성)
+        processed_results = []
+        toxic_indices = [] # 개선안 생성이 필요한 인덱스들
         
-        for i, clause in enumerate(chunks):
-            status_text.markdown(f"**🕵️ 분석 중 ({i+1}/{len(chunks)}):** 제{i+1}조 심사 중...")
+        # 3-1. 기본 결과 매핑
+        for i, res in enumerate(raw_results):
+            # detect 함수에서 나온 결과에 ID(조항 번호) 추가
+            res['id'] = i + 1
+            res['suggestion'] = "" # 초기화
+            processed_results.append(res)
             
-            res = process_single_clause(detector, clause, i)
-            results.append(res)
-            
-            progress_bar.progress((i + 1) / len(chunks))
+            if res['is_toxic']:
+                toxic_indices.append(i)
 
-        status_text.success("✅ 모든 분석이 완료되었습니다!")
-        st.session_state.analysis_results = results
+        # 3-2. 개선안 생성 (위험한 조항만 순차/병렬 처리)
+        # 평가는 빨라도 생성(Suggestion)은 시간이 걸리므로 진행상황을 보여줍니다.
+        if toxic_indices:
+            suggestion_bar = st.progress(0)
+            status_text = st.empty()
+            
+            for idx, list_idx in enumerate(toxic_indices):
+                status_text.text(f"💡 위험 조항({processed_results[list_idx]['id']}조)에 대한 개선안을 생성 중입니다...")
+                
+                # 해당 결과 가져오기
+                target_result = processed_results[list_idx]
+                
+                # 개선안 생성 호출
+                try:
+                    suggestion = detector.generate_easy_suggestion(target_result)
+                    processed_results[list_idx]['suggestion'] = suggestion
+                except Exception as e:
+                    processed_results[list_idx]['suggestion'] = "개선안 생성 실패"
+                
+                suggestion_bar.progress((idx + 1) / len(toxic_indices))
+            
+            status_text.empty()
+            suggestion_bar.empty()
+
+        st.success(f"✅ 분석 완료! (소요 시간: {elapsed_time:.2f}초)")
         
         # 4. 결과 리포트 출력
         st.divider()
         
         # 요약 지표
-        toxic_count = sum(1 for r in results if r.get('is_toxic'))
+        toxic_count = len(toxic_indices)
         col1, col2 = st.columns(2)
-        col1.metric("분석된 조항", f"{len(results)}건")
+        col1.metric("분석된 조항", f"{len(chunks)}건")
         col2.metric("발견된 위험 조항", f"{toxic_count}건", delta="-주의" if toxic_count > 0 else "안전")
 
         # 상세 결과 탭
@@ -190,31 +206,39 @@ def main():
         
         with tab1:
             if toxic_count == 0:
-                st.success("독소조항이 발견되지 않았습니다.")
+                st.balloons()
+                st.success("완벽합니다! 독소조항이 발견되지 않았습니다.")
             else:
-                for res in results:
+                for res in processed_results:
                     if res.get('is_toxic'):
-                        with st.expander(f"⚠️ [위험] 제{res['id']}조 (위험도: {res['score']})", expanded=True):
+                        # 위험도에 따른 색상 구분 (선택사항)
+                        risk_label = "치명적" if res['risk_score'] >= 9 else "위험"
+                        
+                        with st.expander(f"⚠️ [{risk_label}] 제{res['id']}조 (위험도: {res['risk_score']})", expanded=True):
                             c1, c2 = st.columns(2)
                             with c1:
-                                st.caption("원문")
+                                st.caption("❌ 원문 조항")
                                 st.error(res['clause'])
-                                st.markdown(f"**판단 근거:** {res['reason']}")
+                                st.markdown(f"**🔍 판단 근거:**\n{res['reason']}")
                             with c2:
-                                st.caption("AI 솔루션")
-                                st.markdown(res['suggestion'])
-                                with st.popover("참고 법령 확인"):
-                                    st.text(res['context'])
+                                st.caption("💡 AI 수정 제안")
+                                if res['suggestion']:
+                                    st.markdown(res['suggestion'])
+                                else:
+                                    st.info("개선안 생성 중...")
+                                
+                                with st.popover("📜 참고 법령/판례 보기"):
+                                    st.text(res['context_used'])
         
         with tab2:
-            for res in results:
+            st.caption("모든 조항에 대한 AI의 평가 결과입니다.")
+            for res in processed_results:
                 icon = "🔴" if res.get('is_toxic') else "🟢"
-                with st.expander(f"{icon} 제{res['id']}조"):
-                    st.write(res['clause'])
-                    if 'error' in res:
-                        st.error(f"에러: {res['error']}")
-                    else:
-                        st.caption(f"판단 결과: {res['reason']}")
+                score_badge = f"(점수: {res['risk_score']})"
+                
+                with st.expander(f"{icon} 제{res['id']}조 {score_badge}"):
+                    st.code(res['clause'], language="text")
+                    st.write(f"**판단:** {res['reason']}")
 
 if __name__ == "__main__":
     main()
